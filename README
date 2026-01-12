@@ -33,15 +33,19 @@ The setup follows **official Kubernetes best practices**, using:
 Run the following commands **on the Master node**:
 
 ```bash
+
 sudo -i
 chmod +x k8s-master.sh
 ./k8s-master.sh
+
 ```
 
 ### Initialize the Kubernetes control plane:
 
 ```bash
+
 kubeadm init
+
 ```
 
 > Save the `kubeadm join` command printed at the end — it is required for worker nodes.

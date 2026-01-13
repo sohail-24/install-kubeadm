@@ -118,3 +118,114 @@ After cluster setup:
 
 Happy Kubernetes Learning ☸️
 **Built with a DevOps Engineer mindset**
+
+✅ STEP 1 — Initialize Control Plane (MASTER)
+
+kubeadm init \
+  --pod-network-cidr=192.168.0.0/16 \
+  --apiserver-cert-extra-sans=$(hostname -I | awk '{print $1}')
+
+
+Configure kubectl:
+
+mkdir -p ~/.kube
+sudo cp /etc/kubernetes/admin.conf ~/.kube/config
+sudo chown $(id -u):$(id -g) ~/.kube/config
+
+✅ STEP 2 — Install CNI (Calico)
+
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/calico.yaml
+
+Wait:
+
+kubectl get pods -n kube-system
+
+✅ STEP 3 — Join Worker Node(s)
+
+On MASTER:
+
+kubeadm token create --print-join-command
+
+On WORKER:
+
+kubeadm join <MASTER-IP>:6443 --token <TOKEN> \
+--discovery-token-ca-cert-hash sha256:<HASH>
+
+Verify:
+
+kubectl get nodes
+
+✅ STEP 4 — Workload Validation
+
+kubectl create deployment nginx --image=nginx
+kubectl scale deployment nginx --replicas=2
+kubectl get pods
+
+✅ STEP 5 — Metrics Server
+
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+kubectl patch deployment metrics-server -n kube-system \
+  --type=json -p='[
+    {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}
+  ]'
+
+
+Verify:
+
+kubectl top nodes
+kubectl top pods
+
+✅ STEP 6 — HPA
+
+kubectl set resources deployment nginx \
+  --requests=cpu=100m --limits=cpu=200m
+
+kubectl autoscale deployment nginx \
+  --cpu-percent=50 --min=1 --max=5
+
+kubectl get hpa
+
+
+✅ STEP 7 — PodDisruptionBudget
+
+vi nginx-pdb.yaml
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nginx-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: nginx
+
+
+kubectl apply -f nginx-pdb.yaml
+kubectl get pdb
+
+✅ STEP 8 — ClusterIP (Internal Service)
+
+kubectl expose deployment nginx \
+  --name=nginx-clusterip \
+  --port=80 \
+  --target-port=80 \
+  --type=ClusterIP
+
+Test:
+
+kubectl run test --rm -it --image=busybox -- /bin/sh
+
+wget -qO- http://nginx-clusterip.default.svc.cluster.local
+
+
+
+
+
+
+
+
+
+
+

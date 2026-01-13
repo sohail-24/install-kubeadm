@@ -1,30 +1,36 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Installing Kubernetes MASTER node..."
+echo "🚀 Kubernetes MASTER Node Setup Started"
+echo "======================================="
 
 #--------------------------------------------------
 # Root check
 #--------------------------------------------------
 if [ "$EUID" -ne 0 ]; then
-  echo "❌ Run as root: sudo -i"
+  echo "❌ Please run this script using:"
+  echo "   sudo ./k8s-master.sh"
   exit 1
 fi
 
-#--------------------------------------------------
-# Update system
-#--------------------------------------------------
+echo "🖥️  Node Information"
+echo "-------------------"
+echo "Hostname : $(hostname)"
+echo "IP Addr  : $(hostname -I | awk '{print $1}')"
+echo
+
+
+
+#==================================================
+# STEP 1 — System Preparation
+#==================================================
+echo "🔹 STEP 1: System preparation"
+
 apt update && apt upgrade -y
 
-#--------------------------------------------------
-# Disable swap
-#--------------------------------------------------
 swapoff -a
 sed -i '/ swap / s/^/#/' /etc/fstab
 
-#--------------------------------------------------
-# Kernel modules & sysctl
-#--------------------------------------------------
 modprobe br_netfilter
 echo br_netfilter >/etc/modules-load.d/br_netfilter.conf
 
@@ -36,9 +42,14 @@ EOF
 
 sysctl --system
 
-#--------------------------------------------------
-# Install containerd (K8s runtime)
-#--------------------------------------------------
+echo "✅ STEP 1 completed"
+echo
+
+#==================================================
+# STEP 2 — Container Runtime (containerd + Docker)
+#==================================================
+echo "🔹 STEP 2: Installing container runtime"
+
 apt install -y containerd
 mkdir -p /etc/containerd
 containerd config default >/etc/containerd/config.toml
@@ -48,31 +59,59 @@ sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' \
 systemctl restart containerd
 systemctl enable containerd
 
-#--------------------------------------------------
-# Install Docker (optional but useful)
-#--------------------------------------------------
 apt install -y docker.io
 systemctl enable docker
 systemctl start docker
 
-# Add ubuntu user to docker group
 usermod -aG docker ubuntu || true
 
-#--------------------------------------------------
-# Install Kubernetes components
-#--------------------------------------------------
+echo "✅ STEP 2 completed"
+echo
+
+#==================================================
+# STEP 3 — Kubernetes Components
+#==================================================
+echo "🔹 STEP 3: Installing Kubernetes components (v1.29)"
+
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | \
 gpg --dearmor -o /usr/share/keyrings/kubernetes-apt-keyring.gpg
 
 echo "deb [signed-by=/usr/share/keyrings/kubernetes-apt-keyring.gpg] \
 https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" \
-> /etc/apt/sources.list.d/kubernetes.list
+>/etc/apt/sources.list.d/kubernetes.list
 
 apt update
 apt install -y kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
 systemctl enable kubelet
 
-echo "✅ Master prerequisites installed"
-echo "👉 Next: kubeadm init"
+echo "✅ STEP 3 completed"
+echo
 
+#==================================================
+# NEXT STEPS (AUTOMATIC GUIDANCE)
+#==================================================
+echo "🎉 Master prerequisites installation completed!"
+echo "==============================================="
+echo
+echo "👉 NEXT: Initialize Kubernetes control plane"
+echo
+echo "Run the following command on MASTER:"
+echo
+echo "  sudo kubeadm init --pod-network-cidr=192.168.0.0/16"
+echo
+echo "After init, run:"
+echo
+echo "  mkdir -p ~/.kube"
+echo "  sudo cp /etc/kubernetes/admin.conf ~/.kube/config"
+echo "  sudo chown \$(id -u):\$(id -g) ~/.kube/config"
+echo
+echo "Verify:"
+echo "  kubectl get nodes"
+echo
+echo "⚠️ Install Calico ONLY after kubeadm init:"
+echo "  kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/calico.yaml"
+echo
+echo "📌 Save the 'kubeadm join' command printed after init for worker nodes"
+echo
+echo "✅ Script finished successfully"

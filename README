@@ -170,6 +170,9 @@ kubectl patch deployment metrics-server -n kube-system \
     {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}
   ]'
 
+wait 2 min
+
+kubectl get apiservices | grep metrics
 
 Verify:
 

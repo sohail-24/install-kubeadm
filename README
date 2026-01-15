@@ -222,6 +222,104 @@ kubectl run test --rm -it --image=busybox -- /bin/sh
 
 wget -qO- http://nginx-clusterip.default.svc.cluster.local
 
+✅ STEP 9 — NetworkPolicies (Zero Trust)
+
+vi nginx-default-deny.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nginx-default-deny
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx
+  policyTypes:
+  - Ingress
+
+
+kubectl apply -f nginx-default-deny.yaml
+
+
+9.2 Allow traffic ONLY from Ingress Controller
+
+vi nginx-allow-ingress.yaml
+
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nginx-allow-from-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 80
+
+
+kubectl apply -f nginx-allow-ingress.yaml
+
+
+Verify:
+
+kubectl get networkpolicy
+
+✅ STEP 10 — Load Balancer (NGINX Ingress Controller – kubeadm PRO way)
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
+
+
+Wait:
+
+kubectl get pods -n ingress-nginx
+
+
+10.2 Verify Ingress Controller service
+
+kubectl get svc -n ingress-nginx
+
+10.3 Create Ingress rules (Routing)
+
+vi nginx-ingress.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-clusterip
+            port:
+              number: 80
+
+
+kubectl apply -f nginx-ingress.yaml
+
+Verify:
+
+kubectl get ingress
+kubectl describe ingress nginx-ingress
+
+
+
+
+
 
 
 

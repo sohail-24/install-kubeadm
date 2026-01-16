@@ -28,45 +28,7 @@ The setup follows **official Kubernetes best practices**, using:
 
 ---
 
-## 🚀 Master Node Setup
 
-Run the following commands **on the Master node**:
-
-```bash
-
-
-chmod +x k8s-master.sh
-sudo ./k8s-master.sh
-
-```
-
-### Initialize the Kubernetes control plane:
-
-```bash
-
-kubeadm init
-
-```
-
-> Save the `kubeadm join` command printed at the end — it is required for worker nodes.
-
----
-
-## 🚀 Worker Node Setup
-
-Run the following commands **on each Worker node**:
-
-```bash
-
-chmod +x k8s-worker.sh
-sudo ./k8s-worker.sh
-```
-
-### Join the worker node to the cluster:
-
-```bash
-kubeadm join <MASTER-IP>:6443 --token <TOKEN> --discovery-token-ca-cert-hash sha256:<HASH>
-```
 
 ---
 
@@ -118,25 +80,31 @@ After cluster setup:
 
 Happy Kubernetes Learning ☸️
 **Built with a DevOps Engineer mindset**
-
-✅ STEP 1 — Initialize Control Plane (MASTER)
-
-kubeadm init \
-  --pod-network-cidr=192.168.0.0/16 \
-  --apiserver-cert-extra-sans=$(hostname -I | awk '{print $1}')
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
-Configure kubectl:
 
-mkdir -p ~/.kube
-sudo cp /etc/kubernetes/admin.conf ~/.kube/config
-sudo chown $(id -u):$(id -g) ~/.kube/config
 
-✅ STEP 2 — Install CNI (Calico)
 
-kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/calico.yaml
 
-Wait:
+
+
+
+
+
+
+
+## 🚀 Master Node Setup
+
+chmod +x k8s-master.sh
+sudo ./k8s-master.sh
+
+## 🚀 Worker Node Setup
+
+chmod +x k8s-worker.sh
+sudo ./k8s-worker.sh
+
+On Master:
 
 kubectl get pods -n kube-system
 
@@ -170,11 +138,32 @@ kubectl patch deployment metrics-server -n kube-system \
     {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}
   ]'
 
-wait 2 min
+
+
+kubectl edit deployment metrics-server -n kube-system
+
+args:
+- --cert-dir=/tmp
+- --secure-port=4443
+- --kubelet-insecure-tls
+- --kubelet-preferred-address-types=InternalIP
+
+ports:
+- containerPort: 4443
+
+
+kubectl edit svc metrics-server -n kube-system
+
+edit ---> targetPort: 4443
+
+kubectl rollout restart deployment metrics-server -n kube-system
+
+
+Verify: wait 2 min
+
+kubectl get pods -n kube-system | grep metrics
 
 kubectl get apiservices | grep metrics
-
-Verify:
 
 kubectl top nodes
 kubectl top pods
@@ -216,11 +205,13 @@ kubectl expose deployment nginx \
   --target-port=80 \
   --type=ClusterIP
 
+
 Test:
 
 kubectl run test --rm -it --image=busybox -- /bin/sh
 
 wget -qO- http://nginx-clusterip.default.svc.cluster.local
+
 
 ✅ STEP 9 — NetworkPolicies (Zero Trust)
 
@@ -278,6 +269,7 @@ kubectl get networkpolicy
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
 
 
+
 Wait:
 
 kubectl get pods -n ingress-nginx
@@ -316,103 +308,8 @@ Verify:
 kubectl get ingress
 kubectl describe ingress nginx-ingress
 
-✅ STEP 8 — NetworkPolicies (Zero Trust)
-
-vi nginx-default-deny.yaml
-
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: nginx-default-deny
-spec:
-  podSelector:
-    matchLabels:
-      app: nginx
-  policyTypes:
-  - Ingress
-
-kubectl apply -f nginx-default-deny.yaml
-
-vi nginx-allow-ingress.yaml
-
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: nginx-allow-from-ingress
-spec:
-  podSelector:
-    matchLabels:
-      app: nginx
-  policyTypes:
-  - Ingress
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: ingress-nginx
-    ports:
-    - protocol: TCP
-      port: 80
-
-kubectl apply -f nginx-allow-ingress.yaml
-
-Verify
-
-kubectl get networkpolicy
-
-✅ STEP 9 — Ingress Controller (NGINX)
-
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
-
-Wait
-
-kubectl get pods -n ingress-nginx
-
-Verify Ingress Controller Service
-
-kubectl get svc -n ingress-nginx
-
-✅ STEP 10 — Load Balancer (Ingress Routing)
-
-kubectl expose deployment nginx \
-  --name=nginx-clusterip \
-  --port=80 \
-  --target-port=80 \
-  --type=ClusterIP
-
-Test internally
 
 
-kubectl run test --rm -it --image=busybox -- /bin/sh
-
-wget -qO- http://nginx-clusterip.default.svc.cluster.local
-
-10.2 Create Ingress Rules (Routing)
-
-vi nginx-ingress.yaml
-
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: nginx-ingress
-spec:
-  ingressClassName: nginx
-  rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: nginx-clusterip
-            port:
-              number: 80
-
-
-kubectl apply -f nginx-ingress.yaml
-
-kubectl get ingress
-kubectl describe ingress nginx-ingress
 
 Access Application (Browser)
 

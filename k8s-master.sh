@@ -65,6 +65,12 @@ systemctl start docker
 
 usermod -aG docker ubuntu || true
 
+# 🔧 Docker group auto refresh (FIX)
+echo "🔄 Applying docker group without logout..."
+su - ubuntu -c "newgrp docker <<EOF
+docker ps >/dev/null 2>&1
+EOF"
+
 echo "✅ STEP 2 completed"
 echo
 
@@ -107,9 +113,11 @@ echo "  sudo cp /etc/kubernetes/admin.conf ~/.kube/config"
 echo "  sudo chown \$(id -u):\$(id -g) ~/.kube/config"
 echo
 echo "Verify:"
+echo
 echo "  kubectl get nodes"
 echo
 echo "⚠️ Install Calico ONLY after kubeadm init:"
+echo
 echo "  kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/calico.yaml"
 echo
 echo "📌 Save the 'kubeadm join' command printed after init for worker nodes"
